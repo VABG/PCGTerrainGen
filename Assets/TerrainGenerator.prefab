@@ -144,15 +144,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   randomSeed: 0
   resolutionPower: 10
-  frequency: 3
+  frequency: 2
   height: 11
   noiseDivider: 2
-  seed: 1131875065
+  seed: 1919113483
   mapSize: 250
   beachHeight: 0.3
   waterHeight: 0
   beachHeightLow: -0.2
-  mountainAngle: 30
+  mountainAngle: 20
   groundColor:
     serializedVersion: 2
     rgba: 21545
@@ -161,10 +161,10 @@ MonoBehaviour:
     rgba: 7127517
   mountainColor:
     serializedVersion: 2
-    rgba: 2845
+    rgba: 855825
   waterBottomColor:
     serializedVersion: 2
-    rgba: 8564687
+    rgba: 6718360
   waterPlane: {fileID: 8198759042710230688}
 --- !u!33 &8198759044155079267
 MeshFilter:
