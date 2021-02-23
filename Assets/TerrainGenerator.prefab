@@ -144,15 +144,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   randomSeed: 0
   resolutionPower: 10
-  frequency: 2
-  height: 11
-  noiseDivider: 2
-  seed: 1919113483
+  terrainFrequency: 1
+  terrainHeight: 31
+  terrainNoiseDivider: 2
+  seed: -1371221714
   mapSize: 250
   beachHeight: 0.3
   waterHeight: 0
   beachHeightLow: -0.2
-  mountainAngle: 20
+  mountainAngle: 30
   groundColor:
     serializedVersion: 2
     rgba: 21545
@@ -166,6 +166,19 @@ MonoBehaviour:
     serializedVersion: 2
     rgba: 6718360
   waterPlane: {fileID: 8198759042710230688}
+  riverColor:
+    serializedVersion: 2
+    rgba: 0
+  riverSpawnLowestAboveWater: 3
+  riversAmount: 500
+  riverGenerations: 3
+  riverMaxStartSize: 8
+  riverMinStartSize: 2
+  riverStepSize: 4
+  riverMaxWaterDepth: 1.5
+  riverErosionMultiplier: 1
+  riverSearchDist: 4
+  underWaterSmoothingRange: 6
 --- !u!33 &8198759044155079267
 MeshFilter:
   m_ObjectHideFlags: 0

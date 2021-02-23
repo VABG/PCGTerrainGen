@@ -7,27 +7,19 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Water2
-  m_Shader: {fileID: -6465566751694194690, guid: 856905f83980ef84981d01a6f674b1b8,
-    type: 3}
-  m_ShaderKeywords: 
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
+  m_Name: MarkerMaterial
+  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
+  m_ShaderKeywords: _EMISSION
+  m_LightmapFlags: 2
+  m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
+  m_CustomRenderQueue: 2000
+  stringTagMap:
+    RenderType: Opaque
   disabledShaderPasses: []
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - Texture2D_2b5736df79ea41abb045df1d6394ecec:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - Texture2D_db6a9a6c48154a80beef7303b2b8ae41:
-        m_Texture: {fileID: 2800000, guid: 2a4b29a421db854448eba2ca01bd0b68, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _BaseMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -85,14 +77,6 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
-    - Vector1_3e41607c53d946dba93514dab3f88abd: 4
-    - Vector1_4e6b8d769ffe4fafb2ddb9d261c1814e: 0.7
-    - Vector1_6c26f65bd76042d2b53c586c46c611af: 0
-    - Vector1_8945cde9a63144448978708791872325: 30
-    - Vector1_d2eeea5e59884e4db82a4c007297fdfa: 0.1
-    - Vector1_e3690747cf5a4e27b695d4e982a58807: 0.17
-    - Vector1_e61be4f81ab347139ab23eab52db24e2: 5
-    - Vector1_e669589970554099a5a8c67a9bd1d9cc: 38
     - _AlphaClip: 0
     - _Blend: 0
     - _BumpScale: 1
@@ -112,7 +96,7 @@ Material:
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _Smoothness: 0.5
+    - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
@@ -120,19 +104,12 @@ Material:
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
-    - Color_45308071f627485eb18d3d1b249f9bd0: {r: 0.0047169924, g: 1, b: 0.7473686,
-        a: 0}
-    - Color_f84b53b353fc47dfb9f638f1b1668847: {r: 0, g: 0.050066445, b: 0.122641504,
-        a: 0}
-    - Vector2_51634adb759e4b4ba5fcbed3133ab097: {r: 0.013, g: 0.02, b: 0, a: 0}
-    - Vector2_a9419c236aab43c298cfadcf13006e2a: {r: 0.02, g: 0.02, b: 0, a: 0}
-    - Vector2_bd2cb039750e46f68f6d4ce663520faa: {r: 0.01, g: -0.01, b: 0, a: 0}
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseColor: {r: 1, g: 0, b: 0, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _EmissionColor: {r: 1, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
---- !u!114 &4087725966113540497
+--- !u!114 &4258899371506158330
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
