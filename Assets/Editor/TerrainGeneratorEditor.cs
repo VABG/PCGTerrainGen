@@ -44,7 +44,37 @@ public class TerrainGeneratorEditor : Editor
 
         if (GUILayout.Button("Generate Preset (might take a while)"))
         {
+            //General settings
+            t.randomSeed = false;
+
+            //Terrain settings
+            t.resolutionPower = 10;
+            t.terrainFrequency = 1;
+            t.terrainHeight = 31;
+            t.terrainNoiseDivider = 2;
             t.seed = -1371221714;
+            t.mapSize = 250;
+            t.beachHeight = .3f;
+            t.waterHeight = 0;
+            t.beachHeightLow = -.2f;
+            t.mountainAngle = 30;
+
+            // Colors
+            //??
+
+            //River settings
+            t.riverSpawnLowestAboveWater = 3;
+            t.riversAmount = 500;
+            t.riverGenerations = 3;
+            t.riverMaxStartSize = 8;
+            t.riverMinStartSize = 2;
+            t.riverStepSize = 4;
+            t.riverMaxWaterDepth = 1.5f;
+            t.riverErosionMultiplier = 1.0f;
+            t.riverSearchDist = 4;
+            t.underWaterSmoothingRange = 6;
+
+            //Generate
             t.GenerateTerrain();
             t.GenerateRivers();
             t.SmoothUnderwater();

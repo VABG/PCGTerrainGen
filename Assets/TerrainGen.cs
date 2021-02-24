@@ -276,14 +276,20 @@ public bool randomSeed = true;
 
     private void PushHeightAt(Vector3 pos, float radius, float strength)
     {
-        for (int x = -(int)radius-1; x < (int)radius+1; x++)
+
+        for (int x = -(int)radius; x < (int)radius; x++)
         {
-            for (int y = (int)-radius-1; y < (int)radius+1; y++)
+            for (int y = (int)-radius; y < (int)radius; y++)
             {
-                float distMult = 1-(new Vector2(x, y).magnitude/radius);
-                Mathf.Clamp(distMult, 0, 1);
+                //Get world pos                
                 int xPos = (int)pos.x + x;
                 int yPos = (int)pos.y + y;
+                //Get distance
+                Vector2 posXY = new Vector2(pos.x, pos.y);
+                float dist = (new Vector2(xPos, yPos) - posXY).magnitude;
+                float distMult = 1 - (dist / radius);
+                Mathf.Clamp(distMult, 0, 1);
+
                 if (Inside(xPos, yPos))
                 {
                     float targetHeight = pos.z + (strength * distMult);
