@@ -27,8 +27,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 928511926}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 125, y: 2.5, z: 125}
-  m_LocalScale: {x: 250, y: 5, z: 250}
+  m_LocalPosition: {x: 125, y: 4, z: 125}
+  m_LocalScale: {x: 250, y: 8, z: 250}
   m_Children: []
   m_Father: {fileID: 8198759044155079264}
   m_RootOrder: 1
@@ -238,12 +238,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eaa5acadb2d7172448976234e0078e7b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  randomSeed: 0
+  savedSeeds: eb42600f
+  randomSeed: 1
   resolutionPower: 10
   terrainFrequency: 1
-  terrainHeight: 31
+  terrainHeight: 50
   terrainNoiseDivider: 2
-  seed: -1371221714
+  seed: 257966827
   mapSize: 250
   beachHeight: 0.3
   waterHeight: 0

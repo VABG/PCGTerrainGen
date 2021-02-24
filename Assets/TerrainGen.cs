@@ -47,6 +47,7 @@ public class TerrainGen : MonoBehaviour
         new Vector2(-0.687256f, 0.6711345f)
 };
 
+    public List<int> savedSeeds;
 public bool randomSeed = true;
     [Range(2, 11)]
     public int resolutionPower = 2;
@@ -95,7 +96,7 @@ public bool randomSeed = true;
         if (resolutionPower > 12) resolutionPower = 12;
 
         res = (int)Mathf.Pow(2, resolutionPower) + 1;
-        
+
         if (randomSeed)
         {
             seed = (int)System.DateTime.Now.Ticks;

@@ -52,7 +52,7 @@ public class TerrainGeneratorEditor : Editor
             t.terrainFrequency = 1;
             t.terrainHeight = 31;
             t.terrainNoiseDivider = 2;
-            t.seed = -1371221714;
+            t.seed = 257966827;
             t.mapSize = 250;
             t.beachHeight = .3f;
             t.waterHeight = 0;
