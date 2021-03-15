@@ -4,8 +4,6 @@ using UnityEngine;
 using UnityEditor;
 using System.Threading.Tasks;
 
-
-
 public class River
 {
     public River(Vector3 start)
@@ -16,6 +14,7 @@ public class River
     public List<Vector3> riverPoints;
     public float size = 4.0f;
     public float flow = 1.0f;
+    public float length = 0;
 
     public void ClearPoints()
     {
@@ -27,7 +26,7 @@ public class River
 
 public class TerrainGen : MonoBehaviour
 {
-    Vector2[] poissonDisk = 
+    Vector2[] poissonDisk =
     {
         new Vector2(0.2770745f, 0.6951455f),
         new Vector2(0.1874257f, -0.02561589f),
@@ -48,14 +47,14 @@ public class TerrainGen : MonoBehaviour
 };
 
     public List<int> savedSeeds;
-public bool randomSeed = true;
+    public bool randomSeed = true;
     [Range(2, 11)]
     public int resolutionPower = 2;
     [Range(1, 10)]
     public int terrainFrequency = 2;
     [Range(.1f, 100)]
     public float terrainHeight = 256;
-    [Range(1.5f,2.5f)]
+    [Range(1.5f, 2.5f)]
     public float terrainNoiseDivider = 2;
     public int seed = 0;
     private int res = 257;
@@ -70,14 +69,18 @@ public bool randomSeed = true;
     public Color32 mountainColor;
     public Color32 waterBottomColor;
     public Transform waterPlane;
-    private Mesh mesh;
+    private Mesh terrainMesh;
     private float[,] heightmap;
+    private float[,] waterHeightmap;
     private bool wrap = false;
 
     // River settings
+    public List<RiverStart> riverStartPoints;
+    public bool modifyWaterHeight = true;
     public Color32 riverColor;
     public float riverSpawnLowestAboveWater = 3.0f;
     public int riversAmount = 50;
+    public float riverMinLength = 2.0f;
     public int riverGenerations = 10;
     public float riverMaxStartSize = 4;
     [Range(1, 100)]
@@ -85,10 +88,55 @@ public bool randomSeed = true;
     public float riverStepSize = 1.0f;
     [Range(1, 50)]
     public float riverMaxWaterDepth = 2.0f;
-    [Range(1, 5)]
+    [Range(.1f, 5)]
     public float riverErosionMultiplier = 1.0f;
     public float riverSearchDist = 5.0f;
     public float underWaterSmoothingRange = 6.0f;
+
+
+    // Measurements
+    //General
+    private float averageHeight = 0;
+    private float maxHeight = 0;
+    private float minHeight = 0;    
+
+    //River measurements
+    private float riverLengthTotal = 0;
+    private float riverLengthsFinal = 0;
+    private int riversTotal = 0;
+    // Water measurements
+    private float waterPercentage = 0;
+
+    public void MeasureAndPrintStats()
+    {
+        float heights = 0;
+        maxHeight = 0;
+        minHeight = 0;
+        float waterCount = 0;
+        for (int x = 0; x < res; x++)
+        {
+            for (int y = 0; y < res; y++)
+            {
+                if (heightmap[x, y] < minHeight) minHeight = heightmap[x, y];
+                if (heightmap[x, y] > maxHeight) maxHeight = heightmap[x, y];
+                if (heightmap[x, y] < waterHeight) waterCount++;
+                heights += heightmap[x, y];
+            }
+        }
+        //Get percentage
+        waterPercentage = waterCount / (res * res) * 100;
+        averageHeight = heights / (res * res);
+
+        Debug.Log("Terrain Statistics: " +
+            "\nTerrain Average Height: " + averageHeight +
+            "\nTerrain Max Height: " + maxHeight +
+            "\nTerrain Min Height: " + minHeight +
+            "\nWater Percentage: " + waterPercentage + "%" +
+            "\nTotal Rivers: " + riversTotal +
+            "\nTotal River Lenght(km): " + riverLengthTotal/1000 +
+            "\nFinal River Length(km): " + riverLengthsFinal/1000);
+    }
+
 
     public void GenerateTerrain()
     {
@@ -104,15 +152,21 @@ public bool randomSeed = true;
         }
         else Random.InitState(seed);
         heightmap = new float[res, res];
+        waterHeightmap = new float[res, res];
         DiamondSquare(wrap);
         //Make model here
-        MakeModels();
+        MakeModels(false);
         GenerateColors();
-        MoveWaterLevel();
+        //MoveWaterLevel();
+        MeasureAndPrintStats();
     }
 
-    public void GenerateRivers()
+    public void GenerateRivers(bool moveWater = false, bool onlyPrelocated = false)
     {
+        // Reset measurements
+        riverLengthsFinal = 0;
+        riverLengthTotal = 0;
+        riversTotal = 0;
         //Check if there is any terrain
         if (heightmap == null)
         {
@@ -126,49 +180,114 @@ public bool randomSeed = true;
         //1000 tries per river
         List<River> rivers = new List<River>();
 
-        for (int i = 0; i < riversAmount * 1000; i++)
+        if (!onlyPrelocated)
         {
-            Vector3 pos;
-            if (TryPlacingRiverStart(out pos))
+            for (int i = 0; i < riversAmount * 1000; i++)
             {
-                River r = new River(pos);
-                r.size = Random.Range(riverMinStartSize, riverMaxStartSize);
-                r.flow = Random.Range(0.1f, 2);
-                rivers.Add(r);
-                riversPlaced++;
+                Vector3 pos;
+                if (TryPlacingRiverStart(out pos))
+                {
+                    River r = new River(pos);
+                    r.size = Random.Range(riverMinStartSize, riverMaxStartSize);
+                    r.flow = Random.Range(0.1f, 2);
+                    rivers.Add(r);
+                    riversPlaced++;
+                }
+                if (riversPlaced > riverTarget) break;
             }
-            if (riversPlaced > riverTarget) break;
         }
+        else
+        {
+            for (int i = 0; i < riverStartPoints.Count; i++)
+            {
+                //Find relative position
+                Vector3 riverPos = WorldToGenerationSpace(riverStartPoints[i].transform.position);
+                // Check if within terrain borders
+                if (!(riverPos.x < 0 || riverPos.y < 0 || riverPos.x > res || riverPos.y > res))
+                {
+                    // Move to height
+                    float h = HeightAt(new Vector2(riverPos.x, riverPos.y));
+                    River r = new River(new Vector3(riverPos.x, riverPos.y, h));
+                    r.size = riverStartPoints[i].riverSize;
+                    r.flow = riverStartPoints[i].riverFlow;
+                    rivers.Add(r);
+                    riversPlaced++;
+                }
+                else Debug.Log("Transform " + i + " not within borders, river not added!");
+            }
+        }
+
 
         for (int gen = 0; gen < riverGenerations; gen++)
         {
             Parallel.For(0, rivers.Count, index =>
             {
                 FindRiverPath(rivers[index]);
-
             });
 
-            //Find river path
-            //for (int i = 0; i < rivers.Count; i++)
-            //    {
-            //        FindRiverPath(rivers[i]);
-            //    }
+            //Remove any river too short
+            for (int i = rivers.Count-1; i >= 0; i--)
+            {
+                float l = rivers[i].length;
+                Vector3 dist = rivers[i].riverPoints[0] - rivers[i].riverPoints[rivers[i].riverPoints.Count - 1];
+                //2D Distance
+                float l2 = new Vector2(dist.x, dist.y).magnitude;
+                if (l < riverMinLength || l2 < riverMinLength) rivers.RemoveAt(i);
+            }
 
             //Push terrain
             for (int i = 0; i < rivers.Count; i++)
             {
-                PushRiverPath(rivers[i], riverErosionMultiplier, .5f);
+                PushRiverPath(rivers[i], riverErosionMultiplier, 50.0f);
             }
 
+            if (moveWater)
+            {
+                // Fill rivers with water (using heightmap)
+                if (gen == riverGenerations - 1)
+                {
+                    //Move water heightmap
+                    for (int i = 0; i < rivers.Count; i++)
+                    {
+                        PushRiverWaterPath(rivers[i], riverErosionMultiplier);
+                    }
+                }
+            }
             for (int i = 0; i < rivers.Count; i++)
             {
+                riverLengthTotal += rivers[i].length;
                 rivers[i].ClearPoints();
             }
         }
 
-        MakeModels();
-        GenerateColors();
+        for (int i = 0; i < rivers.Count; i++)
+        {
+            riverLengthsFinal += rivers[i].length;
+        }
+        riversTotal = rivers.Count;
+
+
+        if (moveWater) SmoothRivers();
         rivers.Clear();
+        MakeModels(true);
+        GenerateColors();
+        MeasureAndPrintStats();
+    }
+
+    public void SmoothRivers()
+    {
+        for (int x = 0; x < res; x++)
+        {
+            for (int y = 0; y < res; y++)
+            {
+                    float height = 0;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        height += WaterHeightAt(new Vector2(x, y) + poissonDisk[i] * 2);
+                    }
+                    waterHeightmap[x, y] = height / 8;
+            }
+        }
     }
 
     public void SmoothUnderwater(bool makeModel = true)
@@ -177,7 +296,7 @@ public bool randomSeed = true;
         {
             for (int y = 0; y < res; y++)
             {
-                if (heightmap[x,y] < waterHeight)
+                if (heightmap[x, y] < waterHeight)
                 {
                     float height = 0;
                     for (int i = 0; i < 8; i++)
@@ -190,7 +309,7 @@ public bool randomSeed = true;
         }
         if (makeModel)
         {
-            MakeModels();
+            MakeModels(false);
             GenerateColors();
         }
     }
@@ -198,19 +317,43 @@ public bool randomSeed = true;
 
 
     private void FindRiverPath(River r)
-    {        
+    {
         Vector3 activePos = r.riverPoints[0];
         Vector3 lastPos;
         int steps = 0;
-        while(activePos.z > waterHeight - riverMaxWaterDepth)
+        while (activePos.z > waterHeight - riverMaxWaterDepth)
         {
             lastPos = activePos;
-            //Check where is forwards
-            Vector3 dir = GetFlowDirection(activePos, r.size*riverSearchDist, 12);
+            float actualDistance = 0;
+            //Default search radius
+            float searchRadius = 2;            
+            //Check previous moves to see if any significant progress has been made
+            if (r.riverPoints.Count > 2)
+            {
+                for (int i = r.riverPoints.Count - 2; i > 0 && i > r.riverPoints.Count - 10; i--)
+                {
+                    float distanceBack = (r.riverPoints[r.riverPoints.Count - 1] - r.riverPoints[i]).magnitude;
+                    if (distanceBack > 10)
+                    {
+                        break;
+                    }
+                    actualDistance = distanceBack;
+                }
+                // If progress has been mediocre, increase search distance
+                if (actualDistance < 8)
+                {
+                    searchRadius = riverSearchDist;
+                }
+            }
+
+
+            //Check where is forwards, radius increases based on previous movement
+            Vector3 dir = GetFlowDirection(activePos, searchRadius, 12);
+           
             if (steps == 0) activePos += dir * riverStepSize;
             //Mix between flowDir & previousDir
             //dir = ((activePos - lastPos).normalized + dir) / 2;
-            dir = Vector3.Lerp((activePos - lastPos).normalized, dir, 0.5f);
+            dir = Vector3.Lerp((activePos - lastPos).normalized, dir, 0.85f);
 
             activePos += dir * riverStepSize;
             float h = HeightAt(new Vector2(activePos.x, activePos.y));
@@ -220,47 +363,83 @@ public bool randomSeed = true;
             r.riverPoints.Add(activePos);
             //Count steps
             steps++;
+            r.length += (lastPos - activePos).magnitude;
             if (steps > 2000) break;
         }
         //Debug.Log("Steps: " + steps);
     }
 
-    private void PushRiverPath(River r, float strengthMultiplier, float smoothInAmount)
+    private void PushRiverPath(River r, float strengthMultiplier, float smoothInDistance)
     {
-        int smoothing = (int)(r.riverPoints.Count * smoothInAmount);
+        float dist = 0;
+        float smoothing = 0;
         for (int i = 0; i < r.riverPoints.Count; i++)
         {
+            if (i != 0)
+            {
+                dist += (r.riverPoints[i] - r.riverPoints[i - 1]).magnitude;
+                smoothing = dist / smoothInDistance;
+            }
             float strength = 1.0f;
             float waterStrength = 1.0f;
             float waterStrengthZeroStart = 0.0f;
             //Push heightmap here
-            if (i < smoothing)
+            if (dist < smoothInDistance)
             {
-                strength *= (float)i / smoothing;
+                strength *= smoothing;
             }
             if (r.riverPoints[i].z < waterHeight)
             {
                 waterStrengthZeroStart = (Mathf.Abs(r.riverPoints[i].z) / riverMaxWaterDepth);
                 waterStrength *= 1 - waterStrengthZeroStart;
             }
-            PushHeightAt(r.riverPoints[i], r.size*strength, -strength * strengthMultiplier * waterStrength * r.flow);
+            float finalRadius = r.size * strength;
+            float finalStrength = -strength * strengthMultiplier * waterStrength * r.flow;
+            if (finalRadius < 1.0f) finalRadius = 1.0f;
+            if (finalStrength > -.2f) finalStrength = -.2f;
+            PushHeightAt(r.riverPoints[i], finalRadius, finalStrength);
+        }
+    }
+
+    private void PushRiverWaterPath(River r, float smoothInAmount)
+    {
+        int smoothing = (int)(r.riverPoints.Count * smoothInAmount);
+        for (int i = 0; i < r.riverPoints.Count; i++)
+        {
+            //Move height down to lowest point
+            float strength = 1.0f;
+            //Push heightmap here
+            if (i < smoothing)
+            {
+                strength *= (float)i / smoothing;
+            }
+            PushWaterHeightAt(r.riverPoints[i], r.size * strength);
         }
     }
 
     private Vector3 GenerationSpaceToWorld(Vector3 genSpacePos)
     {
         float mult = mapSize / (res - 1);
-        return new Vector3(genSpacePos.x*mult, genSpacePos.z, genSpacePos.y*mult);        
+        return transform.position + 
+            new Vector3(genSpacePos.x * mult, genSpacePos.z, genSpacePos.y * mult);
     }
+    
+    private Vector3 WorldToGenerationSpace(Vector3 worldPos)
+    {
+        Vector3 fromOrigin = worldPos;
+        float div = (res - 1) / mapSize;
+        return new Vector3(fromOrigin.x*div, fromOrigin.z*div, fromOrigin.y);
+    }
+
 
     private Vector3 GetFlowDirection(Vector3 pos, float radius, int samples)
     {
-        if (samples >= 16) samples = 15;
+        if (samples > 15) samples = 15;
         Vector3[] directions = new Vector3[samples];
         Vector3 gather = Vector3.zero;
         for (int i = 0; i < samples; i++)
         {
-            Vector2 newPos2D =  new Vector2(pos.x, pos.y) + new Vector2(poissonDisk[i].x * radius * 2, poissonDisk[i].y * radius * 2);
+            Vector2 newPos2D = new Vector2(pos.x, pos.y) + new Vector2(poissonDisk[i].x * radius * 2, poissonDisk[i].y * radius * 2);
             float h = HeightAt(newPos2D);
             Vector3 newPos = new Vector3(newPos2D.x, newPos2D.y, h);
             Vector3 rel = newPos - pos;
@@ -273,7 +452,6 @@ public bool randomSeed = true;
         gather.Normalize();
         return gather;
     }
-
 
     private void PushHeightAt(Vector3 pos, float radius, float strength)
     {
@@ -295,12 +473,41 @@ public bool randomSeed = true;
                 {
                     float targetHeight = pos.z + (strength * distMult);
                     if (heightmap[xPos, yPos] > targetHeight)
-                    heightmap[xPos, yPos] = targetHeight;
+                        heightmap[xPos, yPos] = targetHeight;
                 }
-                
+
             }
         }
     }
+
+    private void PushWaterHeightAt(Vector3 pos, float radius)
+    {
+        //Make sure height is low enough
+        pos.z = HeightAt(new Vector2(pos.x, pos.y));
+        for (int x = -(int)radius; x < (int)radius; x++)
+        {
+            for (int y = (int)-radius; y < (int)radius; y++)
+            {
+                //Get world pos                
+                int xPos = (int)pos.x + x;
+                int yPos = (int)pos.y + y;
+                //Get distance
+                Vector2 posXY = new Vector2(pos.x, pos.y);
+                float dist = (new Vector2(xPos, yPos) - posXY).magnitude;
+                float distMult = 1 - (dist / radius);
+                Mathf.Clamp(distMult, 0, 1);
+
+                if (Inside(xPos, yPos))
+                {
+                    float targetHeight = pos.z;
+                    if (targetHeight > waterHeight)
+                        waterHeightmap[xPos, yPos] = targetHeight;
+                }
+
+            }
+        }
+    }
+
 
     private bool TryPlacingRiverStart(out Vector3 pos)
     {
@@ -324,6 +531,14 @@ public bool randomSeed = true;
         return height;
     }
 
+    private float WaterHeightAt(Vector2 pos)
+    {
+        Vector4 heights = GetWaterHeights(pos);
+        Vector2 localPos = new Vector2(pos.x % 1, pos.y % 1);
+        float height = Mathf.Lerp(Mathf.Lerp(heights.z, heights.w, pos.x), Mathf.Lerp(heights.y, heights.x, pos.x), pos.y);
+        return height;
+    }
+
     private Vector4 GetHeights(Vector2 pos)
     {
         int xInt = Mathf.CeilToInt(pos.x);
@@ -336,26 +551,26 @@ public bool randomSeed = true;
         if (yInt >= res) yInt = res - 2;
         float h0 = heightmap[xInt, yInt];
         float h1 = heightmap[xInt - 1, yInt];
-        float h2 = heightmap[xInt - 1, yInt-1];
+        float h2 = heightmap[xInt - 1, yInt - 1];
         float h3 = heightmap[xInt, yInt - 1];
         return new Vector4(h0, h1, h2, h3);
     }
 
-    public float TerrainAboveWaterAmount()
+    private Vector4 GetWaterHeights(Vector2 pos)
     {
-        float above = 0;
-        for (int x = 0; x < mapSize; x++)
-        {
-            for (int y = 0; y < mapSize; y++)
-            {
-                if (heightmap[x, y] > waterHeight)
-                {
-                    above ++;
-                }
-            }
-        }
-        above /= (mapSize * mapSize);
-        return above;
+        int xInt = Mathf.CeilToInt(pos.x);
+        int yInt = Mathf.CeilToInt(pos.y);
+
+        //Edge case 0,0 fix
+        if (xInt - 1 <= 0) xInt = 1;
+        if (yInt - 1 <= 0) yInt = 1;
+        if (xInt >= res) xInt = res - 2;
+        if (yInt >= res) yInt = res - 2;
+        float h0 = waterHeightmap[xInt, yInt];
+        float h1 = waterHeightmap[xInt - 1, yInt];
+        float h2 = waterHeightmap[xInt - 1, yInt - 1];
+        float h3 = waterHeightmap[xInt, yInt - 1];
+        return new Vector4(h0, h1, h2, h3);
     }
 
     public void MoveWaterLevel()
@@ -363,20 +578,22 @@ public bool randomSeed = true;
         waterPlane.position = new Vector3(waterPlane.position.x, waterHeight, waterPlane.position.z);
     }
     //Eventually make this divide into sections? LOD models by generating lower res?
-    public void MakeModels()
+    public void MakeModels(bool makeWater)
     {
-        MakeModel(new Vector2Int(0, 0), new Vector2Int(res, res), 0);
+        MakeModel(new Vector2Int(0, 0), new Vector2Int(res, res), 0, GetComponent<MeshFilter>(), heightmap);
+        terrainMesh = GetComponent<MeshFilter>().sharedMesh;
+        if (makeWater) MakeModel(new Vector2Int(0, 0), new Vector2Int(res, res), 0, waterPlane.gameObject.GetComponent<MeshFilter>(), waterHeightmap);
     }
 
-    public Vector3[] GetVec3Stream(Vector2Int start, Vector2Int end)
+    public Vector3[] GetVec3Stream(Vector2Int start, Vector2Int end, float[,] heights)
     {
-        float mult = mapSize/(res-1);
+        float mult = mapSize / (res - 1);
         Vector3[] map = new Vector3[res * res];
         for (int y = 0; y < res; y++)
         {
             for (int x = 0; x < res; x++)
             {
-                map[res * y + x] = new Vector3(x*mult, heightmap[x, y], y*mult);
+                map[res * y + x] = new Vector3(x * mult, heights[x, y], y * mult);
             }
         }
         return map;
@@ -396,7 +613,7 @@ public bool randomSeed = true;
         int step = (res - 1); ///(int)Mathf.Pow(2, frequency);
         int halfStep = step / 2;
         int divisions = 0;
-        float randomRange = terrainHeight/2;
+        float randomRange = terrainHeight / 2;
         float noiseDivLocal = terrainNoiseDivider;
         //TODO: At frequencies higher than 0, do steps but at much lower values (at first step values)
 
@@ -490,9 +707,9 @@ public bool randomSeed = true;
 
     private float Sample(int x, int y)
     {
-            int xPos = WrapValue(x);
-            int yPos = WrapValue(y);
-            return heightmap[xPos, yPos];
+        int xPos = WrapValue(x);
+        int yPos = WrapValue(y);
+        return heightmap[xPos, yPos];
     }
 
     private bool Inside(int x, int y)
@@ -516,48 +733,50 @@ public bool randomSeed = true;
         mf.sharedMesh.Clear();
     }
 
-    private void MakeModel(Vector2Int start, Vector2Int end, int subMesh)
+    private void MakeModel(Vector2Int start, Vector2Int end, int subMesh, MeshFilter mf, float[,] heights)
     {
-        mesh = new Mesh();
-        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        Mesh m = new Mesh();
+        m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         Vector2Int size = end - start;
         //Make vertices
-        Vector3[] vertices = GetVec3Stream(start, end);
-        mesh.vertices = vertices;
+        Vector3[] vertices = GetVec3Stream(start, end, heights);
+        m.vertices = vertices;
 
         //Make tris
-        int[] indices = new int[(size.x-1)*(size.y-1)*6];
-        for (int y = start.y; y < end.y -1; y++)
+        int[] indices = new int[(size.x - 1) * (size.y - 1) * 6];
+        for (int y = start.y; y < end.y - 1; y++)
         {
             for (int x = start.x; x < end.x - 1; x++)
             {
                 int initial = y * (res - 1) * 6 + x * 6;
                 //First triangle
                 indices[initial] = y * res + x; //0 at beginnning
-                indices[initial + 1] = (y+1) * res + x; //2 at beginnning
+                indices[initial + 1] = (y + 1) * res + x; //2 at beginnning
                 indices[initial + 2] = y * res + x + 1; //1 at beginnning
                 //Second triangle
-                indices[initial + 3] = (y+1) * res + x; //2 at beginnning
-                indices[initial + 4] = (y+1) * res + x + 1; //3 at beginnning
+                indices[initial + 3] = (y + 1) * res + x; //2 at beginnning
+                indices[initial + 4] = (y + 1) * res + x + 1; //3 at beginnning
                 indices[initial + 5] = y * res + x + 1; //1 at beginnning
             }
         }
-        mesh.SetIndices(indices, MeshTopology.Triangles, subMesh);
-        Vector2[] uvs = new Vector2[mesh.vertices.Length];
+        m.SetIndices(indices, MeshTopology.Triangles, subMesh);
+        Vector2[] uvs = new Vector2[m.vertices.Length];
         int uvLength = uvs.Length;
-
+        Vector3[] normals = new Vector3[m.vertices.Length];
         for (int i = 0; i < uvLength; i++)
         {
-            uvs[i] = new Vector2(vertices[i].x, vertices[i].z); //TODO: Test
+            uvs[i] = -new Vector2(vertices[i].x, vertices[i].z)/(res/4);
+            normals[i] = Vector3.down;
         }
         //Add UVs
-        mesh.SetUVs(0, uvs);
+        m.SetUVs(0, uvs);
         //GenerateColors();
-        mesh.RecalculateNormals();
+        m.RecalculateNormals();
+        m.RecalculateTangents();
         //Add colors
 
-        var mf = GetComponent<MeshFilter>();
-        mf.mesh = mesh;
+        //var mf = GetComponent<MeshFilter>();
+        mf.mesh = m;
     }
 
     public void Optimize()
@@ -571,10 +790,10 @@ public bool randomSeed = true;
     public void GenerateColors()
     {
         //Would be cool if some kind of noise-bias could be incorporated as well.
-        Vector3[] vertices = mesh.vertices;
-        Vector3[] normals = mesh.normals;
+        Vector3[] vertices = terrainMesh.vertices;
+        Vector3[] normals = terrainMesh.normals;
 
-        Color32[] colors = new Color32[mesh.vertices.Length];
+        Color32[] colors = new Color32[terrainMesh.vertices.Length];
         int colLength = colors.Length;
         for (int i = 0; i < colLength; i++)
         {
@@ -602,6 +821,6 @@ public bool randomSeed = true;
                 colors[i] = groundColor;
             }
         }
-        mesh.colors32 = colors;
+        terrainMesh.colors32 = colors;
     }
 }
